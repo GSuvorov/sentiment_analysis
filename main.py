@@ -19,7 +19,7 @@ from sklearn.svm import SVC
 
 
 STOPWORDS = stopwords.words('russian')
-DATA = 5000
+DATA = 20000
 
 
 class NBSVM(BaseEstimator, LinearClassifierMixin, SparseCoefMixin):
@@ -73,7 +73,7 @@ def clean_tweets(a):
     a = ' '.join(a)
     punctuation = ['.', ',', '-']
     pos_smile=[')',':)',':D',';)',':-)',':P','=)','(:',';-)','=D','=]',';D',':]']
-    neg_smile=['(',':(','=(',';(',':-(','=/','=(','D:',':-/',':|']
+    neg_smile=['(',':(','=(',';(',':-(','=/','D:',':-/',':|']
 
     for p in list(pos_smile):
         a = a.replace(p, ' положительныйэмотикон ')
@@ -88,13 +88,13 @@ def clean_tweets(a):
     result = re.sub(r'[^а-яеёА-ЯЕЁ0-9-_*.]', ' ', result)  # символы
     result = ''.join(ch for ch, _ in itertools.groupby(result))  # повторяющиеся буквы
     result = re.sub(r'[a-zA-Z]+', ' ', result)
-
     result = result.lower()
+
     for p in list(punctuation):
         result = result.replace(p, ' ')
     result = re.sub(r'\s+', ' ', result)
     cleantweet = result.strip()
-    cleantweet = ' '.join(word for word in cleantweet.split() if len(word) > 2)
+    #cleantweet = ' '.join(word for word in cleantweet.split() if len(word) > 2)
     return cleantweet
 
 
@@ -103,29 +103,30 @@ def load_data():
     text = list()
     sentiment = list()
 
-    file = open('data/pos.csv', "rt", encoding='utf-8')
-    reader = csv.reader(file)
-    f = open("data/pos.txt", 'w')
+    pos_csv_file = open('data/pos.csv', "rt", encoding='utf-8')
+    reader = csv.reader(pos_csv_file)
+    pos_txt_file = open("data/pos.txt", 'w')
     for row in reader:
         cleanrow = clean_tweets(row)
-        f.write(cleanrow + "\n")
+        pos_txt_file.write(cleanrow + "\n")
         data.append([cleanrow, '1'])
-    f.close()
+    pos_txt_file.close()
 
-    file = open('data/neg.csv', "rt", encoding='utf-8')
-    reader = csv.reader(file)
-    f = open("data/neg.txt", 'w')
+    neg_csv_file = open('data/neg.csv', "rt", encoding='utf-8')
+    reader = csv.reader(neg_csv_file)
+    neg_txt_file = open("data/neg.txt", 'w')
     for row in reader:
         cleanrow = clean_tweets(row)
-        f.write(cleanrow + "\n")
+        neg_txt_file.write(cleanrow + "\n")
         data.append([cleanrow, '0'])
-    f.close()
+    neg_txt_file.close()
 
     random.shuffle(data)
     data = data[:DATA]
     for i in data:
         text.append(i[0])
         sentiment.append(i[1])
+
     return text, sentiment
 
 
@@ -153,7 +154,7 @@ def crossvalidation(x, y, vectorizer, classifier):
     return scorestrain, scorestest
 
 
-def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.1, 1.0, 10)):
+def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
     plt.figure()
     plt.title(title)
     if ylim is not None:
@@ -197,7 +198,7 @@ def main():
     classifier = SVC()
     print("Обучение модели")
     learning_curves("Learning Curves (SVM, Linear kernel", X, sentiment, classifier)
-    scorestrain, scorestest = crossvalidation(text, sentiment, vectorizer, classifier)
+    #scorestrain, scorestest = crossvalidation(text, sentiment, vectorizer, classifier)
 
 
     # classifier = NBSVM()
