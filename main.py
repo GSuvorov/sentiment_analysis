@@ -148,62 +148,72 @@ def crossvalidation(x, y, vectorizer, classifier):
         scorestrain.append(classifier.fit(X_train, y_train).score(X_train, y_train))
         scorestest.append(classifier.fit(X_train, y_train).score(X_test, y_test))
         y_predicted = classifier.predict(X_test)
-        print("*****")
-        print("Отчет классификации - %s" % classifier)
-        print(metrics.classification_report(y_test, y_predicted))
+        #print("*****")
+        #print("Отчет классификации - %s" % classifier)
+        #print(metrics.classification_report(y_test, y_predicted))
     return scorestrain, scorestest
 
 
-def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
+def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(0.1, 1., 5)):
     plt.figure()
     plt.title(title)
     if ylim is not None:
         plt.ylim(*ylim)
     plt.xlabel("Training examples")
     plt.ylabel("Score")
-    train_sizes, train_scores, test_scores = learning_curve(
-        estimator, X, y, cv=cv, n_jobs=n_jobs, train_sizes=train_sizes)
+    train_sizes, train_scores, test_scores = learning_curve(estimator, X, y, cv=cv, n_jobs=n_jobs, train_sizes=train_sizes)
     train_scores_mean = np.mean(train_scores, axis=1)
     train_scores_std = np.std(train_scores, axis=1)
     test_scores_mean = np.mean(test_scores, axis=1)
     test_scores_std = np.std(test_scores, axis=1)
     plt.grid()
-
-    plt.fill_between(train_sizes, train_scores_mean - train_scores_std,
-                     train_scores_mean + train_scores_std, alpha=0.1,
-                     color="r")
-    plt.fill_between(train_sizes, test_scores_mean - test_scores_std,
-                     test_scores_mean + test_scores_std, alpha=0.1, color="g")
-    plt.plot(train_sizes, train_scores_mean, 'o-', color="r",
-             label="Training score")
-    plt.plot(train_sizes, test_scores_mean, 'o-', color="g",
-             label="Cross-validation score")
-
+    plt.fill_between(train_sizes, train_scores_mean - train_scores_std,train_scores_mean + train_scores_std, alpha=0.1,color="r")
+    plt.fill_between(train_sizes, test_scores_mean - test_scores_std,test_scores_mean + test_scores_std, alpha=0.1, color="g")
+    plt.plot(train_sizes, train_scores_mean, 'o-', color="r",label="Training score")
+    plt.plot(train_sizes, test_scores_mean, 'o-', color="g",label="Cross-validation score")
     plt.legend(loc="best")
     return plt
 
 
 def learning_curves(title, x, y, estimator):
     cv = ShuffleSplit(n_splits=5, test_size=0.2, random_state=0)
-    plot_learning_curve(estimator, title, x, y, (0.4, 1.1), cv=cv, n_jobs=4)
+    plot_learning_curve(estimator, title, x, y, (0.4, 1), cv=cv, n_jobs=4)
     plt.show()
 
 
 def main():
     token_pattern = r'\w+|[%s]' % string.punctuation
-    vectorizer = CountVectorizer(ngram_range=(1, 2), token_pattern=token_pattern,stop_words=STOPWORDS)
+    vectorizer = CountVectorizer(ngram_range=(1, 2), token_pattern=token_pattern,binary=False,stop_words=STOPWORDS,min_df=2)
     text, sentiment = load_data()
-    X = vectorizer.fit_transform(text)
-    print("Vocabulary Size: %s" % len(vectorizer.vocabulary_))
-    classifier = SVC()
-    print("Обучение модели")
-    learning_curves("Learning Curves (SVM, Linear kernel", X, sentiment, classifier)
-    #scorestrain, scorestest = crossvalidation(text, sentiment, vectorizer, classifier)
+    #X = vectorizer.fit_transform(text)
+    #print("Vocabulary Size: %s" % len(vectorizer.vocabulary_))
+    #classifier = SVC()
+    #print("Обучение модели")
 
+    #learning_curves("Learning Curves (SVM, Linear kernel", X, sentiment, classifier)
+    #scorestrain, scorestest = crossvalidation(text, sentiment, vectorizer, classifier)
+    datatrain=text[:10000]
+    datatest=text[10000:]
+    ytrain=sentiment[:10000]
+    ytest=sentiment[10000:]
+    classifier = SVC()
+    X_train = vectorizer.fit_transform(datatrain)
+    X_test=vectorizer.transform(datatest)
+    classifier.fit(X_train, ytrain)
+    y_predicted = classifier.predict(X_test)
+    print("Vocabulary Size: %s" % len(vectorizer.vocabulary_))
+    print('Точность: %s' % classifier.score(X_test, ytest))
+    print("Отчет классификации - %s" % classifier)
+    print(metrics.classification_report(ytest, y_predicted))
+
+    scorestrain, scorestest = crossvalidation(text, sentiment, vectorizer, classifier)
+    print(scorestrain)
+    print(scorestest)
 
     # classifier = NBSVM()
     # sentiment = list(map(int, sentiment))
-    # sentiment = np.array(sentiment)
+    # sentiment =
+    # .array(sentiment)
     #X_train=vectorizer.fit_transform(text[:160000])
     #X_test=vectorizer.transform(text[160000:])
     #y_train=sentiment[:160000]
