@@ -7,7 +7,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from nltk.corpus import stopwords
 from scipy.sparse import spmatrix, coo_matrix
-
 import sklearn.metrics as metrics
 from sklearn.base import BaseEstimator
 from sklearn.feature_extraction.text import CountVectorizer
@@ -16,9 +15,11 @@ from sklearn.model_selection import ShuffleSplit
 from sklearn.model_selection import learning_curve
 from sklearn.svm import LinearSVC
 from sklearn.svm import SVC
+import pymorphy2
+from pyaspeller import Word
 
 STOPWORDS = stopwords.words('russian')
-DATA = 20000
+DATA = 10000
 
 
 class NBSVM(BaseEstimator, LinearClassifierMixin, SparseCoefMixin):
@@ -67,8 +68,45 @@ class NBSVM(BaseEstimator, LinearClassifierMixin, SparseCoefMixin):
         return coef_, intercept_
 
 
+def spellchecking(cleantweet):
+    list_word = cleantweet.split()
+    result_string = []
+    morph = pymorphy2.MorphAnalyzer()
+
+    for word in list_word:
+        check = Word(word)
+        if not check.correct:
+            if (len(check.variants)) == 0:
+                pass
+            else:
+                print(word)
+                print(check.variants)
+                word = check.variants[0]
+        else:
+            pass
+
+        word = morph.parse(word)[0].normal_form
+        word = str(word)
+        result_string.append(word)
+    return " ".join(result_string)
+
+
+def normalizewords(cleantweet):
+    list_word = cleantweet.split()
+    result_string = []
+    morph = pymorphy2.MorphAnalyzer()
+
+    for word in list_word:
+        word = morph.parse(word)[0].normal_form
+        word = str(word)
+        result_string.append(word)
+    return " ".join(result_string)
+
+
 def clean_tweets(a, pos_emoji, neg_emoji):
+
     a = ' '.join(a)
+    a = ''.join(ch for ch, _ in itertools.groupby(a))
 
     for p in list(pos_emoji):
         a = a.replace(p, ' положительныйэмотикон ')
@@ -81,13 +119,11 @@ def clean_tweets(a, pos_emoji, neg_emoji):
     result = re.sub(r'RT', '', result)  # RT
     result = re.sub(r'(?:(?:\d+,?)+(?:\.?\d+)?)', ' ', result)  # цифры
     result = re.sub(r'[^а-яеёА-ЯЕЁ0-9-_*.]', ' ', result)  # символы
-    result = ''.join(ch for ch, _ in itertools.groupby(result))  # повторяющиеся буквы
-    result = re.sub(r'[a-zA-Z.,?!@#$%^&*()_+]+', ' ', result) # англ слова и символы
-    result = result.lower() #приведение к низкому регистру
-    result = re.sub(r'\s+', ' ', result) #лишние пробелы
+    result = re.sub(r'[a-zA-Z.,?!@#$%^&*()_+-]+', ' ', result)  # англ слова и символы
+    result = result.lower()  # приведение к низкому регистру
+    result = re.sub(r'\s+', ' ', result)  # лишние пробелы
     cleantweet = result.strip()
-    #cleantweet = ' '.join(word for word in cleantweet.split() if len(word) > 2)
-
+    cleantweet = ' '.join(word for word in cleantweet.split() if len(word) > 1)
     return cleantweet
 
 
@@ -98,12 +134,12 @@ def load_data():
     pos_emoji = []
     neg_emoji = []
 
-    file = open('data/possmile', "rt", encoding='utf-8')
+    file = open('data/possmile.txt', "rt", encoding='utf-8')
     for line in file:
         line = line.replace("\n", "")
         pos_emoji.append(line)
 
-    file = open('data/negsmile', "rt", encoding='utf-8')
+    file = open('data/negsmile.txt', "rt", encoding='utf-8')
     for line in file:
         line = line.replace("\n", "")
         neg_emoji.append(line)
@@ -120,6 +156,7 @@ def load_data():
     neg_csv_file = open('data/neg.csv', "rt", encoding='utf-8')
     reader = csv.reader(neg_csv_file)
     neg_txt_file = open("data/neg.txt", 'w')
+
     for row in reader:
         cleanrow = clean_tweets(row, pos_emoji, neg_emoji)
         neg_txt_file.write(cleanrow + "\n")
@@ -159,7 +196,7 @@ def crossvalidation(x, y, vectorizer, classifier):
     return scorestrain, scorestest
 
 
-def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.1, 1.0, 10 )):
+def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
     plt.figure()
     plt.title(title)
     if ylim is not None:
@@ -174,13 +211,13 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, tr
     plt.grid()
 
     plt.plot(train_sizes, train_scores_mean, 'o-', color="r", label="Training score")
-    plt.plot(train_sizes, test_scores_mean, 'o-', color="g", label="Cross-validation score")
+    plt.plot(train_sizes, test_scores_mean, 'o-', color="g", label="Testing score")
     plt.legend(loc="best")
     return plt
 
 
 def learning_curves(title, x, y, estimator):
-    cv = ShuffleSplit(n_splits=10, test_size=0.2,train_size=0.8, random_state=0)
+    cv = ShuffleSplit(n_splits=5, test_size=0.2, train_size=0.8, random_state=0)
     plot_learning_curve(estimator, title, x, y, (0.4, 1.01), cv=cv, n_jobs=20)
     plt.show()
 
