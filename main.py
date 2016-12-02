@@ -3,11 +3,13 @@ import itertools
 import random
 import re
 import string
-import numpy as np
 import matplotlib.pyplot as plt
-from nltk.corpus import stopwords
-from scipy.sparse import spmatrix, coo_matrix
+import numpy as np
+import pymorphy2
 import sklearn.metrics as metrics
+from nltk.corpus import stopwords
+from pyaspeller import Word
+from scipy.sparse import spmatrix, coo_matrix
 from sklearn.base import BaseEstimator
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model.base import LinearClassifierMixin, SparseCoefMixin
@@ -15,11 +17,9 @@ from sklearn.model_selection import ShuffleSplit
 from sklearn.model_selection import learning_curve
 from sklearn.svm import LinearSVC
 from sklearn.svm import SVC
-import pymorphy2
-from pyaspeller import Word
 
 STOPWORDS = stopwords.words('russian')
-DATA = 10000
+DATA = 20000
 
 
 class NBSVM(BaseEstimator, LinearClassifierMixin, SparseCoefMixin):
@@ -103,10 +103,21 @@ def normalizewords(cleantweet):
     return " ".join(result_string)
 
 
-def clean_tweets(a, pos_emoji, neg_emoji):
+def obscene_check(a, obscene):
+    list_word = a.split()
+    result_string = []
+    for word in list_word:
+        for p in list(obscene):
+            if word == p:
+                word = ' обсценная лексика '
+            else:
+                word = word
+        result_string.append(word)
+    return " ".join(result_string)
 
+
+def clean_tweets(a, pos_emoji, neg_emoji, obscene):
     a = ' '.join(a)
-    a = ''.join(ch for ch, _ in itertools.groupby(a))
 
     for p in list(pos_emoji):
         a = a.replace(p, ' положительныйэмотикон ')
@@ -120,10 +131,17 @@ def clean_tweets(a, pos_emoji, neg_emoji):
     result = re.sub(r'(?:(?:\d+,?)+(?:\.?\d+)?)', ' ', result)  # цифры
     result = re.sub(r'[^а-яеёА-ЯЕЁ0-9-_*.]', ' ', result)  # символы
     result = re.sub(r'[a-zA-Z.,?!@#$%^&*()_+-]+', ' ', result)  # англ слова и символы
+    result = ''.join(ch for ch, _ in itertools.groupby(result))  # повторяющиеся буквы
     result = result.lower()  # приведение к низкому регистру
+
     result = re.sub(r'\s+', ' ', result)  # лишние пробелы
-    cleantweet = result.strip()
-    cleantweet = ' '.join(word for word in cleantweet.split() if len(word) > 1)
+
+    cleantweet = ' '.join(word for word in result.split() if len(word) > 2)  # удаление слов длинной 1,2 символа
+
+    cleantweet = obscene_check(cleantweet, obscene)  # проверка на наличие обсценной лексики
+
+    cleantweet = cleantweet.strip()
+
     return cleantweet
 
 
@@ -133,6 +151,12 @@ def load_data():
     sentiment = list()
     pos_emoji = []
     neg_emoji = []
+    obscene = []
+
+    file = open('data/obscene.txt', "rt", encoding='utf-8')
+    for line in file:
+        line = line.replace("\n", "")
+        obscene.append(line)
 
     file = open('data/possmile.txt', "rt", encoding='utf-8')
     for line in file:
@@ -148,7 +172,7 @@ def load_data():
     reader = csv.reader(pos_csv_file)
     pos_txt_file = open("data/pos.txt", 'w')
     for row in reader:
-        cleanrow = clean_tweets(row, pos_emoji, neg_emoji)
+        cleanrow = clean_tweets(row, pos_emoji, neg_emoji, obscene)
         pos_txt_file.write(cleanrow + "\n")
         data.append([cleanrow, '1'])
     pos_txt_file.close()
@@ -158,7 +182,7 @@ def load_data():
     neg_txt_file = open("data/neg.txt", 'w')
 
     for row in reader:
-        cleanrow = clean_tweets(row, pos_emoji, neg_emoji)
+        cleanrow = clean_tweets(row, pos_emoji, neg_emoji, obscene)
         neg_txt_file.write(cleanrow + "\n")
         data.append([cleanrow, '0'])
     neg_txt_file.close()
@@ -196,28 +220,77 @@ def crossvalidation(x, y, vectorizer, classifier):
     return scorestrain, scorestest
 
 
-def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
+def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.2, 1.0, 10)):
+    """
+    Generate a simple plot of the test and training learning curve.
+
+    Parameters
+    ----------
+    estimator : object type that implements the "fit" and "predict" methods
+        An object of that type which is cloned for each validation.
+
+    title : string
+        Title for the chart.
+
+    X : array-like, shape (n_samples, n_features)
+        Training vector, where n_samples is the number of samples and
+        n_features is the number of features.
+
+    y : array-like, shape (n_samples) or (n_samples, n_features), optional
+        Target relative to X for classification or regression;
+        None for unsupervised learning.
+
+    ylim : tuple, shape (ymin, ymax), optional
+        Defines minimum and maximum yvalues plotted.
+
+    cv : int, cross-validation generator or an iterable, optional
+        Determines the cross-validation splitting strategy.
+        Possible inputs for cv are:
+          - None, to use the default 3-fold cross-validation,
+          - integer, to specify the number of folds.
+          - An object to be used as a cross-validation generator.
+          - An iterable yielding train/test splits.
+
+        For integer/None inputs, if ``y`` is binary or multiclass,
+        :class:`StratifiedKFold` used. If the estimator is not a classifier
+        or if ``y`` is neither binary nor multiclass, :class:`KFold` is used.
+
+        Refer :ref:`User Guide <cross_validation>` for the various
+        cross-validators that can be used here.
+
+    n_jobs : integer, optional
+        Number of jobs to run in parallel (default 1).
+    """
     plt.figure()
     plt.title(title)
     if ylim is not None:
         plt.ylim(*ylim)
     plt.xlabel("Training examples")
     plt.ylabel("Score")
-
-    train_sizes, train_scores, test_scores = learning_curve(estimator, X, y, cv=cv, n_jobs=n_jobs,
-                                                            train_sizes=train_sizes)
+    train_sizes, train_scores, test_scores = learning_curve(
+        estimator, X, y, cv=cv, n_jobs=n_jobs, train_sizes=train_sizes)
     train_scores_mean = np.mean(train_scores, axis=1)
+    train_scores_std = np.std(train_scores, axis=1)
     test_scores_mean = np.mean(test_scores, axis=1)
+    test_scores_std = np.std(test_scores, axis=1)
     plt.grid()
 
-    plt.plot(train_sizes, train_scores_mean, 'o-', color="r", label="Training score")
-    plt.plot(train_sizes, test_scores_mean, 'o-', color="g", label="Testing score")
+    plt.fill_between(train_sizes, train_scores_mean - train_scores_std,
+                     train_scores_mean + train_scores_std, alpha=0.1,
+                     color="r")
+    plt.fill_between(train_sizes, test_scores_mean - test_scores_std,
+                     test_scores_mean + test_scores_std, alpha=0.1, color="g")
+    plt.plot(train_sizes, train_scores_mean, 'o-', color="r",
+             label="Training score")
+    plt.plot(train_sizes, test_scores_mean, 'o-', color="g",
+             label="Cross-validation score")
+
     plt.legend(loc="best")
     return plt
 
 
 def learning_curves(title, x, y, estimator):
-    cv = ShuffleSplit(n_splits=5, test_size=0.2, train_size=0.8, random_state=0)
+    cv = ShuffleSplit(n_splits=10, test_size=0.2, train_size=0.8, random_state=0)
     plot_learning_curve(estimator, title, x, y, (0.4, 1.01), cv=cv, n_jobs=20)
     plt.show()
 
