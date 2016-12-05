@@ -1,25 +1,32 @@
-import csv
-import itertools
-import random
-import re
-import string
-import matplotlib.pyplot as plt
-import numpy as np
-import pymorphy2
-import sklearn.metrics as metrics
-from nltk.corpus import stopwords
-from pyaspeller import Word
+from sklearn.linear_model.base import LinearClassifierMixin, SparseCoefMixin
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import learning_curve
+from sklearn.model_selection import ShuffleSplit
+from sklearn.model_selection import GridSearchCV
+from sklearn.naive_bayes import MultinomialNB
 from scipy.sparse import spmatrix, coo_matrix
 from sklearn.base import BaseEstimator
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.linear_model.base import LinearClassifierMixin, SparseCoefMixin
-from sklearn.model_selection import ShuffleSplit
-from sklearn.model_selection import learning_curve
+import sklearn.metrics as metrics
+from nltk.corpus import stopwords
 from sklearn.svm import LinearSVC
+import matplotlib.pyplot as plt
 from sklearn.svm import SVC
+from sklearn import metrics
+from pyaspeller import Word
+import pandas as pd
+import numpy as np
+import pymorphy2
+import itertools
+import random
+import string
+import csv
+import re
 
 STOPWORDS = stopwords.words('russian')
-DATA = 20000
+DATA = 5000
 
 
 class NBSVM(BaseEstimator, LinearClassifierMixin, SparseCoefMixin):
@@ -220,7 +227,7 @@ def crossvalidation(x, y, vectorizer, classifier):
     return scorestrain, scorestest
 
 
-def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.2, 1.0, 10)):
+def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.2, 1.0, 5)):
     """
     Generate a simple plot of the test and training learning curve.
 
@@ -286,12 +293,16 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, tr
              label="Cross-validation score")
 
     plt.legend(loc="best")
+    print('train scores')
+    print(train_scores)
+    print('test scores')
+    print(train_scores)
     return plt
 
 
 def learning_curves(title, x, y, estimator):
-    cv = ShuffleSplit(n_splits=10, test_size=0.2, train_size=0.8, random_state=0)
-    plot_learning_curve(estimator, title, x, y, (0.4, 1.01), cv=cv, n_jobs=20)
+    cv = ShuffleSplit(n_splits=5, test_size=0.2, train_size=0.8, random_state=0)
+    plot_learning_curve(estimator, title, x, y, (0.4, 1.02), cv=cv, n_jobs=-1)
     plt.show()
 
 
@@ -302,48 +313,24 @@ def main():
     text, sentiment = load_data()
     X = vectorizer.fit_transform(text)
     print("Объем словаря: %s" % len(vectorizer.vocabulary_))
-    classifier = SVC()
-    print("Обучение модели")
-    learning_curves("Learning Curves (SVM, RBF kernel", X, sentiment, classifier)
-
-
-
-    # scorestrain, scorestest = crossvalidation(text, sentiment, vectorizer, classifier)
-    # print("Отчет классификации - %s" % classifier)
-    # print(metrics.classification_report(ytest, y_predicted))
-
-    # datatrain=text[:10000]
-    # datatest=text[10000:]
-    # ytrain=sentiment[:10000]
-    # ytest=sentiment[10000:]
     # classifier = SVC()
-    # X_train = vectorizer.fit_transform(datatrain)
-    # X_test=vectorizer.transform(datatest)
-    # classifier.fit(X_train, ytrain)
-    # y_predicted = classifier.predict(X_test)
-    # print("Vocabulary Size: %s" % len(vectorizer.vocabulary_))
-    # print('Точность: %s' % classifier.score(X_test, ytest))
-    # print("Отчет классификации - %s" % classifier)
-    # print(metrics.classification_report(ytest, y_predicted))
-    # scorestrain, scorestest = crossvalidation(text, sentiment, vectorizer, classifier)
+    # classifier = MultinomialNB()
+    classifier = RandomForestClassifier(n_estimators=10, n_jobs=-1)
+    print("Обучение модели")
+
+    word_freq_df = pd.DataFrame(
+        {'term': vectorizer.get_feature_names(), 'occurrences': np.asarray(X.sum(axis=0)).ravel().tolist()})
+    word_freq_df['frequency'] = word_freq_df['occurrences'] / np.sum(word_freq_df['occurrences'])
+    print(word_freq_df.sort_values('occurrences', ascending=False))
+
+    learning_curves("Learning Curves" + str(classifier), X, sentiment, classifier)
 
 
-    # print(scorestrain)
-    # print(scorestest)
 
-    # classifier = NBSVM()
-    # sentiment = list(map(int, sentiment))
-    # sentiment =
-    # .array(sentiment)
-    # X_train=vectorizer.fit_transform(text[:160000])
-    # X_test=vectorizer.transform(text[160000:])
-    # y_train=sentiment[:160000]
-    # y_test=sentiment[160000:]
-    # classifier.fit(X_train, y_train)
-    # y_predicted = classifier.predict(X_test)
-    # print('Точность: %s' % classifier.score(X_test, y_test))
-    # print("Отчет классификации - %s" % classifier)
-    # print(metrics.classification_report(y_test, y_predicted))
+    # X_train, X_test, y_train, y_test = train_test_split(X, sentiment, test_size = 0.8, random_state = 42)
+    # classifier.fit(X_train,y_train)
+    # prediction = classifier.predict(X_test)
+    # print(metrics.classification_report(y_test, prediction))
 
 
 if __name__ == '__main__':
