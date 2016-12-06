@@ -313,21 +313,24 @@ def main():
     text, sentiment = load_data()
     X = vectorizer.fit_transform(text)
     print("Объем словаря: %s" % len(vectorizer.vocabulary_))
-    # classifier = SVC()
-    # classifier = MultinomialNB()
-    classifier = RandomForestClassifier(n_estimators=10, n_jobs=-1)
+    classifier = SVC()
+    #classifier = MultinomialNB()
+    #classifier = RandomForestClassifier(n_estimators=10, n_jobs=-1)
     print("Обучение модели")
+    #word_freq_df = pd.DataFrame(
+    #    {'term': vectorizer.get_feature_names(), 'occurrences': np.asarray(X.sum(axis=0)).ravel().tolist()})
+    #word_freq_df['frequency'] = word_freq_df['occurrences'] / np.sum(word_freq_df['occurrences'])
+    #print(word_freq_df.sort_values('occurrences', ascending=False))
+    #learning_curves("Learning Curves" + str(classifier), X, sentiment, classifier)
 
-    word_freq_df = pd.DataFrame(
-        {'term': vectorizer.get_feature_names(), 'occurrences': np.asarray(X.sum(axis=0)).ravel().tolist()})
-    word_freq_df['frequency'] = word_freq_df['occurrences'] / np.sum(word_freq_df['occurrences'])
-    print(word_freq_df.sort_values('occurrences', ascending=False))
-
-    learning_curves("Learning Curves" + str(classifier), X, sentiment, classifier)
-
-
-
-    # X_train, X_test, y_train, y_test = train_test_split(X, sentiment, test_size = 0.8, random_state = 42)
+    X_train, X_test, y_train, y_test = train_test_split(X, sentiment, test_size = 0.2, random_state = 42)
+    C_range = 10.0 ** np.arange(-4, 4)
+    gamma_range = 10.0 ** np.arange(-4, 4)
+    param_grid = dict(gamma=gamma_range.tolist(), C=C_range.tolist())
+    grid = GridSearchCV(classifier, param_grid)
+    grid.fit(X_train, y_train)
+    print("The best classifier is: ", grid.best_estimator_)
+    print(grid.best_score_)
     # classifier.fit(X_train,y_train)
     # prediction = classifier.predict(X_test)
     # print(metrics.classification_report(y_test, prediction))
