@@ -24,11 +24,12 @@ import pymorphy2
 import itertools
 import random
 import string
+import time
 import csv
 import re
 
 STOPWORDS = stopwords.words('russian')
-DATA = 5000
+DATA = 20000
 
 
 class NBSVM(BaseEstimator, LinearClassifierMixin, SparseCoefMixin):
@@ -125,13 +126,17 @@ def obscene_check(a, obscene):
     return " ".join(result_string)
 
 
-def clean_tweets(a, pos_emoji, neg_emoji, obscene):
+def clean_tweets(a, pos_emoji, neg_emoji, obscene, pos_words, neg_words):
     a = ' '.join(a)
 
     for p in list(pos_emoji):
-        a = a.replace(p, ' положительныйэмотикон ')
+          a = a.replace(p, ' положительныйэмотикон ')
     for p in list(neg_emoji):
-        a = a.replace(p, ' негативныйэмотикон ')
+          a = a.replace(p, ' негативныйэмотикон ')
+    for p in list(pos_words):
+          a = a.replace(p, ' положительноеслово ')
+    for p in list(neg_words):
+          a = a.replace(p, ' негативноеслово ')
 
     result = re.sub(r'(?:@[\w_]+)', '', a)  # упоминания
     result = re.sub(r'(?:\#+[\w_]+[\w\'_\-]*[\w_]+)', '', result)  # хештеги
@@ -151,7 +156,7 @@ def clean_tweets(a, pos_emoji, neg_emoji, obscene):
 
     cleantweet = cleantweet.strip()
 
-    return cleantweet
+    return a
 
 
 def load_data():
@@ -161,6 +166,18 @@ def load_data():
     pos_emoji = []
     neg_emoji = []
     obscene = []
+    pos_words = []
+    neg_words = []
+
+    file = open('data/pos_words.txt', "rt", encoding='utf-8')
+    for line in file:
+        line = line.replace("\n", "")
+        pos_words.append(line)
+
+    file = open('data/neg_words.txt', "rt", encoding='utf-8')
+    for line in file:
+        line = line.replace("\n", "")
+        neg_words.append(line)
 
     file = open('data/obscene.txt', "rt", encoding='utf-8')
     for line in file:
@@ -181,7 +198,7 @@ def load_data():
     reader = csv.reader(pos_csv_file)
     pos_txt_file = open("data/pos.txt", 'w')
     for row in reader:
-        cleanrow = clean_tweets(row, pos_emoji, neg_emoji, obscene)
+        cleanrow = clean_tweets(row, pos_emoji, neg_emoji, obscene, pos_words, neg_words)
         pos_txt_file.write(cleanrow + "\n")
         data.append([cleanrow, '1'])
     pos_txt_file.close()
@@ -191,7 +208,7 @@ def load_data():
     neg_txt_file = open("data/neg.txt", 'w')
 
     for row in reader:
-        cleanrow = clean_tweets(row, pos_emoji, neg_emoji, obscene)
+        cleanrow = clean_tweets(row, pos_emoji, neg_emoji, obscene, neg_words, neg_words)
         neg_txt_file.write(cleanrow + "\n")
         data.append([cleanrow, '0'])
     neg_txt_file.close()
@@ -206,8 +223,8 @@ def load_data():
 
 
 def crossvalidation(x, y, vectorizer, classifier):
-    X_folds = np.array_split(x, 5)
-    y_folds = np.array_split(y, 5)
+    X_folds = np.array_split(x, 10)
+    y_folds = np.array_split(y, 10)
     scorestrain = list()
     scorestest = list()
     for k in range(5):
@@ -229,7 +246,7 @@ def crossvalidation(x, y, vectorizer, classifier):
     return scorestrain, scorestest
 
 
-def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.2, 1.0, 5)):
+def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, train_sizes=np.linspace(.1, 1, 10)):
     """
     Generate a simple plot of the test and training learning curve.
 
@@ -280,66 +297,61 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, tr
         plt.ylim(*ylim)
     plt.xlabel(u"Объем тренировочной выборки")
     plt.ylabel(u"Точность")
-    train_sizes, train_scores, test_scores = learning_curve(
-        estimator, X, y, cv=cv, n_jobs=n_jobs, train_sizes=train_sizes)
+    train_sizes, train_scores, test_scores = learning_curve(estimator, X, y, cv=cv, n_jobs=n_jobs, train_sizes=train_sizes)
     train_scores_mean = np.mean(train_scores, axis=1)
     train_scores_std = np.std(train_scores, axis=1)
     test_scores_mean = np.mean(test_scores, axis=1)
     test_scores_std = np.std(test_scores, axis=1)
     plt.grid()
 
-    plt.fill_between(train_sizes, train_scores_mean - train_scores_std,
-                     train_scores_mean + train_scores_std, alpha=0.1,
-                     color="r")
-    plt.fill_between(train_sizes, test_scores_mean - test_scores_std,
-                     test_scores_mean + test_scores_std, alpha=0.1, color="g")
-    plt.plot(train_sizes, train_scores_mean, 'o-', color="r",
-             label=u"Точность обучения")
-    plt.plot(train_sizes, test_scores_mean, 'o-', color="g",
-             label=u"Точность тестирования")
+    #plt.fill_between(train_sizes, train_scores_mean, alpha=0.1,color="r")
+    #plt.fill_between(train_sizes, test_scores_mean, alpha=0.1, color="g")
+
+    plt.plot(train_sizes, train_scores_mean, 'o-', color="r",label=u"Точность обучения")
+    plt.plot(train_sizes, test_scores_mean, 'o-', color="g",label=u"Точность тестирования")
 
     plt.legend(loc="best")
-    print('train scores')
-    print(train_scores)
-    print('test scores')
-    print(train_scores)
+    # print('train scores')
+    # print(train_scores)
+    # print('test scores')
+    # print(train_scores)
     return plt
 
 
 def learning_curves(title, x, y, estimator):
-    cv = ShuffleSplit(n_splits=5, test_size=0.2, train_size=0.8, random_state=0)
+    cv = ShuffleSplit(n_splits=10, test_size=0.2, train_size=0.8, random_state=0)
     plot_learning_curve(estimator, title, x, y, (0.4, 1.02), cv=cv, n_jobs=-1)
     plt.show()
 
 
 def main():
     token_pattern = r'\w+|[%s]' % string.punctuation
-    vectorizer = CountVectorizer(ngram_range=(1, 2), token_pattern=token_pattern, binary=False, stop_words=STOPWORDS,
-                                 min_df=2)
+    vectorizer = CountVectorizer(ngram_range=(1,2), token_pattern=token_pattern, binary=False, stop_words=STOPWORDS,min_df=2)
     text, sentiment = load_data()
     X = vectorizer.fit_transform(text)
     print("Объем словаря: %s" % len(vectorizer.vocabulary_))
-    classifier = SVC()
-    #classifier = MultinomialNB()
-    #classifier = RandomForestClassifier(n_estimators=10, n_jobs=-1)
+    # classifier = SVC()
+    # classifier = MultinomialNB()
+    classifier = RandomForestClassifier(n_estimators=10, n_jobs=-1)
     print("Обучение модели")
-    #word_freq_df = pd.DataFrame(
+    # word_freq_df = pd.DataFrame(
     #    {'term': vectorizer.get_feature_names(), 'occurrences': np.asarray(X.sum(axis=0)).ravel().tolist()})
-    #word_freq_df['frequency'] = word_freq_df['occurrences'] / np.sum(word_freq_df['occurrences'])
-    #print(word_freq_df.sort_values('occurrences', ascending=False))
-    #learning_curves("Learning Curves" + str(classifier), X, sentiment, classifier)
+    # word_freq_df['frequency'] = word_freq_df['occurrences'] / np.sum(word_freq_df['occurrences'])
+    # print(word_freq_df.sort_values('occurrences', ascending=False))
+    #learning_curves(u'Кривая обучения', X, sentiment, classifier)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, sentiment, test_size = 0.2, random_state = 42)
-    C_range = 10.0 ** np.arange(-4, 4)
-    gamma_range = 10.0 ** np.arange(-4, 4)
-    param_grid = dict(gamma=gamma_range.tolist(), C=C_range.tolist())
-    grid = GridSearchCV(classifier, param_grid)
-    grid.fit(X_train, y_train)
-    print("The best classifier is: ", grid.best_estimator_)
-    print(grid.best_score_)
-    # classifier.fit(X_train,y_train)
-    # prediction = classifier.predict(X_test)
-    # print(metrics.classification_report(y_test, prediction))
+
+    X_train, X_test, y_train, y_test = train_test_split(X, sentiment, test_size = 0.5)
+    # gamma_range = 10.0 ** np.arange(-4, 4)
+    # param_grid = dict(gamma=gamma_range.tolist(), C=C_range.tolist())
+    # grid = GridSearchCV(classifier, param_grid)
+    # grid.fit(X_train, y_train)
+    # print("The best classifier is: ", grid.best_estimator_)
+    # print(grid.best_score_)
+
+    classifier.fit(X_train,y_train)
+    prediction = classifier.predict(X_test)
+    print(metrics.classification_report(y_test, prediction))
 
 
 if __name__ == '__main__':
