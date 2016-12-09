@@ -29,7 +29,7 @@ import csv
 import re
 
 STOPWORDS = stopwords.words('russian')
-DATA = 20000
+DATA = 10000
 
 
 class NBSVM(BaseEstimator, LinearClassifierMixin, SparseCoefMixin):
@@ -119,7 +119,7 @@ def obscene_check(a, obscene):
     for word in list_word:
         for p in list(obscene):
             if word == p:
-                word = ' обсценная лексика '
+                word = ' обсценнаялексика '
             else:
                 word = word
         result_string.append(word)
@@ -133,6 +133,7 @@ def clean_tweets(a, pos_emoji, neg_emoji, obscene, pos_words, neg_words):
           a = a.replace(p, ' положительныйэмотикон ')
     for p in list(neg_emoji):
           a = a.replace(p, ' негативныйэмотикон ')
+
     for p in list(pos_words):
           a = a.replace(p, ' положительноеслово ')
     for p in list(neg_words):
@@ -156,7 +157,7 @@ def clean_tweets(a, pos_emoji, neg_emoji, obscene, pos_words, neg_words):
 
     cleantweet = cleantweet.strip()
 
-    return a
+    return cleantweet
 
 
 def load_data():
@@ -304,44 +305,51 @@ def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None, n_jobs=1, tr
     test_scores_std = np.std(test_scores, axis=1)
     plt.grid()
 
-    #plt.fill_between(train_sizes, train_scores_mean, alpha=0.1,color="r")
-    #plt.fill_between(train_sizes, test_scores_mean, alpha=0.1, color="g")
+    plt.fill_between(train_sizes, train_scores_mean - train_scores_std,
+                     train_scores_mean + train_scores_std, alpha=0.1,
+                     color="r")
+    plt.fill_between(train_sizes, test_scores_mean - test_scores_std,
+                     test_scores_mean + test_scores_std, alpha=0.1, color="g")
 
     plt.plot(train_sizes, train_scores_mean, 'o-', color="r",label=u"Точность обучения")
     plt.plot(train_sizes, test_scores_mean, 'o-', color="g",label=u"Точность тестирования")
 
     plt.legend(loc="best")
-    # print('train scores')
-    # print(train_scores)
-    # print('test scores')
-    # print(train_scores)
+    print('train scores')
+    print(train_scores)
+    print('test scores')
+    print(train_scores)
     return plt
 
 
 def learning_curves(title, x, y, estimator):
-    cv = ShuffleSplit(n_splits=10, test_size=0.2, train_size=0.8, random_state=0)
+    cv = ShuffleSplit(n_splits=10, test_size=0.2)
     plot_learning_curve(estimator, title, x, y, (0.4, 1.02), cv=cv, n_jobs=-1)
     plt.show()
+
+def term_freq(vectorizer):
+    word_freq_df = pd.DataFrame(
+        {'term': vectorizer.get_feature_names(), 'occurrences': np.asarray(X.sum(axis=0)).ravel().tolist()})
+    word_freq_df['frequency'] = word_freq_df['occurrences'] / np.sum(word_freq_df['occurrences'])
+    word_freq_df.sort_values('occurrences', ascending=False).to_csv('data/term_frequences.csv')
 
 
 def main():
     token_pattern = r'\w+|[%s]' % string.punctuation
-    vectorizer = CountVectorizer(ngram_range=(1,2), token_pattern=token_pattern, binary=False, stop_words=STOPWORDS,min_df=2)
+    vectorizer = CountVectorizer(ngram_range=(1,2), token_pattern=token_pattern, binary=False,stop_words=STOPWORDS,min_df=2)
     text, sentiment = load_data()
     X = vectorizer.fit_transform(text)
     print("Объем словаря: %s" % len(vectorizer.vocabulary_))
-    # classifier = SVC()
+
+    classifier = SVC()
     # classifier = MultinomialNB()
-    classifier = RandomForestClassifier(n_estimators=10, n_jobs=-1)
+    # classifier = RandomForestClassifier(n_estimators=10, n_jobs=-1)
     print("Обучение модели")
-    # word_freq_df = pd.DataFrame(
-    #    {'term': vectorizer.get_feature_names(), 'occurrences': np.asarray(X.sum(axis=0)).ravel().tolist()})
-    # word_freq_df['frequency'] = word_freq_df['occurrences'] / np.sum(word_freq_df['occurrences'])
-    # print(word_freq_df.sort_values('occurrences', ascending=False))
-    #learning_curves(u'Кривая обучения', X, sentiment, classifier)
+    term_freq(vectorizer)
+    learning_curves(u'Кривая обучения', X, sentiment, classifier)
 
+    # X_train, X_test, y_train, y_test = train_test_split(X, sentiment, test_size = 0.2)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, sentiment, test_size = 0.5)
     # gamma_range = 10.0 ** np.arange(-4, 4)
     # param_grid = dict(gamma=gamma_range.tolist(), C=C_range.tolist())
     # grid = GridSearchCV(classifier, param_grid)
@@ -349,9 +357,9 @@ def main():
     # print("The best classifier is: ", grid.best_estimator_)
     # print(grid.best_score_)
 
-    classifier.fit(X_train,y_train)
-    prediction = classifier.predict(X_test)
-    print(metrics.classification_report(y_test, prediction))
+    # classifier.fit(X_train,y_train)
+    # prediction = classifier.predict(X_test)
+    # print(metrics.classification_report(y_test, prediction))
 
 
 if __name__ == '__main__':
