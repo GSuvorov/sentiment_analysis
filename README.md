@@ -2,7 +2,6 @@
 1. В качестве метода машинного обучения использовался SVM с RBF-ядром
 2. [Корпус размеченных сообщения для обучения и тестирования](http://study.mokoron.com/)
 3. В соответсвии с данным корпусом были составлены различные словари для повышения точности классификации
-![alt-текст](https://github.com/VladislavShipovskoi/sentiment_analysis/blob/master/result.png "Результат")
 
 # Результат
-
+![alt-текст](https://github.com/VladislavShipovskoi/sentiment_analysis/blob/master/result.png "Результат")
