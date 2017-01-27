@@ -6,12 +6,15 @@
 
 # Используемые библиотеки
 
-1. sklearn
-2. matplotlib
-3. pandas
-4. numpy
-5. scipy
-6. nltk (stopwords)
+1. matplotlib (2.0.0)
+2. nltk (3.2.2)
+3. numpy (1.12.0)
+4. pandas (0.19.2)
+5. pyaspeller (0.1.0)
+6. pymorphy2 (0.8)
+7. pymorphy2-dicts (2.4.393442.3710985)
+8. scikit-learn (0.18.1)
+9. scipy (0.18.1)
 
 # Результат
 
