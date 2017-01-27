@@ -10,5 +10,7 @@
 2. matplotlib
 3. pandas
 4. numpy
+
 # Результат
+
 ![alt-текст](https://github.com/VladislavShipovskoi/sentiment_analysis/blob/master/result.png "Результат")
